@@ -1,26 +1,132 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ── Marketing Brain — warm editorial dark theme ─────────────────────────
+   Deep warm near-black + parchment/gold accent. Reading-first.            */
+@theme {
+  --color-bg: #0a0a09;
+  --color-surface: #131210;
+  --color-surface-2: #1a1815;
+  --color-elevated: #201d19;
+  --color-border: #2b2823;
+  --color-border-strong: #3a362e;
+
+  --color-fg: #ece7dc;
+  --color-fg-muted: #a89f8c;
+  --color-fg-subtle: #736c5d;
+
+  --color-accent: #d4c4a8;
+  --color-accent-strong: #e0a458;
+  --color-accent-dim: #8f836c;
+
+  --color-danger: #e5776b;
+  --color-ok: #9cc38a;
+
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-outfit), var(--font-manrope), sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+
+  --radius: 0.875rem;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* subtle warm vignette, fixed so it doesn't scroll */
+  background-image:
+    radial-gradient(1100px 620px at 15% -8%, rgba(224, 164, 88, 0.06), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(212, 196, 168, 0.045), transparent 55%);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: rgba(224, 164, 88, 0.28);
+  color: var(--color-fg);
+}
+
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 999px;
+  border: 3px solid var(--color-bg);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--color-accent-dim); }
+
+:focus-visible {
+  outline: 2px solid var(--color-accent-strong);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── shimmer skeleton ─────────────────────────────────────────────────── */
+@keyframes mb-shimmer {
+  0% { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface) 0%,
+    var(--color-elevated) 45%,
+    var(--color-surface) 90%
+  );
+  background-size: 1200px 100%;
+  animation: mb-shimmer 1.6s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shimmer { animation: none; }
+}
+
+@keyframes mb-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: mb-fade-up 0.4s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .fade-up { animation: none; }
+}
+
+/* ── markdown (Ask answers) ───────────────────────────────────────────── */
+.prose-mb {
+  color: var(--color-fg);
+  line-height: 1.72;
+  font-size: 0.975rem;
+}
+.prose-mb h1, .prose-mb h2, .prose-mb h3 {
+  font-family: var(--font-display);
+  color: var(--color-fg);
+  font-weight: 600;
+  margin: 1.4em 0 0.5em;
+  line-height: 1.25;
+}
+.prose-mb h1 { font-size: 1.4rem; }
+.prose-mb h2 { font-size: 1.2rem; }
+.prose-mb h3 { font-size: 1.05rem; }
+.prose-mb p { margin: 0.7em 0; }
+.prose-mb ul, .prose-mb ol { margin: 0.7em 0; padding-left: 1.35em; }
+.prose-mb li { margin: 0.3em 0; }
+.prose-mb ul { list-style: disc; }
+.prose-mb ol { list-style: decimal; }
+.prose-mb strong { color: var(--color-fg); font-weight: 650; }
+.prose-mb a { color: var(--color-accent-strong); text-decoration: underline; text-underline-offset: 2px; }
+.prose-mb code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  padding: 0.1em 0.4em;
+  border-radius: 5px;
+}
+.prose-mb blockquote {
+  border-left: 3px solid var(--color-accent-dim);
+  padding-left: 1em;
+  color: var(--color-fg-muted);
+  margin: 0.9em 0;
 }
