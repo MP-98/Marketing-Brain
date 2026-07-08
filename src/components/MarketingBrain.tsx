@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Brain, RefreshCw, Archive, Settings, Sparkles, CalendarClock } from "lucide-react";
+import Link from "next/link";
+import { Brain, RefreshCw, Archive, Settings, Sparkles, CalendarClock, PenSquare } from "lucide-react";
 import { BriefingView } from "./BriefingView";
 import { AskSection } from "./AskSection";
 import { SettingsDialog } from "./SettingsDialog";
@@ -168,6 +169,14 @@ export function MarketingBrain() {
           </div>
 
           <div className="flex items-center gap-1.5 relative">
+            <Link
+              href="/studio"
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 h-8 text-[13px] text-fg-muted hover:text-fg hover:bg-surface-2 transition-colors mr-1"
+              title="Content Studio — audit & rewrite drafts"
+            >
+              <PenSquare className="w-4 h-4" />
+              <span className="hidden sm:inline">Studio</span>
+            </Link>
             {phase !== "generating" && (
               <Button
                 size="sm"

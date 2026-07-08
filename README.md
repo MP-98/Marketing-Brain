@@ -2,7 +2,7 @@
 
 A daily marketing **intelligence engine** — rebuilt as a real Next.js app on **Supabase** (replacing the original MongoDB prototype).
 
-This is **System A** from the engineer handoff (`docs/context.md`): a daily learning + intelligence + networking agent. It surfaces understanding and raw material — it does **not** write finished social posts. (System B, the content audit/rewrite tool, is a separate build.)
+This is **System A** from the engineer handoff (`docs/context.md`): a daily learning + intelligence + networking agent. It surfaces understanding and raw material — it does **not** write finished social posts. **System B** (Content Studio, at `/studio`) is the separate content audit/rewrite tool — see below.
 
 Every morning it produces:
 
@@ -110,4 +110,21 @@ Deploy to **Vercel** and point it at your Supabase project. Set the three env va
 ## Notes / next steps
 
 - **Trending grounding.** Trending moments are currently model-generated with a "use real, verifiable events" instruction. The highest-value enhancement is wiring OpenAI's web-search tool (Responses API) into `genTrending` so moments are grounded in live search results.
-- **System B** (content audit/rewrite against `docs/content-voice-guide.md`) is intentionally out of scope for this build — see `docs/context.md` §4.
+
+---
+
+## System B — Content Studio (`/studio`)
+
+A deliberately separate, minimal tool (`docs/context.md` §4). **You** write the draft; this audits and rewrites it against the voice guide (`docs/content-voice-guide.md`). It never generates from a topic — paste a System A content package in and it's treated as a draft to fix, not a prompt to expand.
+
+Pick a target (LinkedIn personal/company, X personal/company, Instagram), paste a draft, hit **Audit & Rewrite**. It runs the guide's 3-pass process:
+
+1. **Audit** — flags every violation (banned words, em dashes, banned phrases, formal transitions, semicolons, same-length-sentence runs, hedges, rhythm-only triads, generic phrasing).
+2. **Critique** — one sentence per flag on what's wrong and what it needs.
+3. **Rewrite** — applies Voice / Rhythm / Specificity, keeps every fact/figure/name, stays within ~10% of length, and respects platform notes (repurposed long-form dressed as an X post is a hard fail).
+
+Two layers under the hood:
+- **`src/lib/voice.ts`** — a deterministic regex scanner for the "hard nos". It's exact and free: it grounds the LLM audit **and** re-checks the rewrite, so the UI shows a green "publish check passed" only when the rewrite is genuinely clean.
+- **`src/lib/audit.ts`** + `POST /api/audit` — the LLM 3-pass (strict structured output, `gpt-4o`), with the voice guide embedded in the system prompt (`src/lib/voiceGuide.ts`).
+
+Kept clean-separate from System A per the handoff: its own route, API, lib files, and UI — sharing only the OpenAI wrapper and design primitives.
