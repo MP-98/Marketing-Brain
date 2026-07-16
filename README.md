@@ -6,12 +6,14 @@ This is **System A** from the engineer handoff (`docs/context.md`): a daily lear
 
 Every morning it produces:
 
-1. **The Concept** — one idea, deep enough to teach, with failure modes, mechanism, and 3 real case studies.
-2. **Reactive Moments** — real events/viral moments with the D2C/FMCG marketing angle on top.
-3. **Worth Your Time** — 5–7 high-signal resources.
-4. **People to Know** — 2–3 relevant people, each with a **draft** LinkedIn connect message (always human-reviewed before sending — see below).
-5. **Content Package** — raw material for your own drafts: the core point, the facts to keep, and which angle makes it postable. **Not** finished copy.
-6. **Ask** — freeform Q&A grounded in the day's brief + your Obsidian vault.
+1. **§1 Concept of the Day** — one concept, 1,400–1,600 words, India-first, with a **named academic citation**, 3 failure modes, a procedural mechanism, 3 misuses, and 3 case studies (≥2 Indian) each ending in a `STEAL THIS` imperative.
+2. **§2 What's Trending** — 5 real, this-week signals (grounded in **live web search**), accordion, ~280 words each, split into `WHAT HAPPENED / WHY IT'S INTERESTING / WHAT TO DO WITH IT`.
+3. **§3 Underrated Resources** — 6–7 cards, opinionated curator blurbs that tie each back to the day's concept.
+4. **§4 Authorities to Know** — exactly 3 *reachable* operators/writers (no C-suite of listed companies), each with a `why reachable` line + a 150–230-char **draft** LinkedIn message (human-reviewed before sending).
+5. **§5 Content Angles** — 5 ready-to-ship post ideas, accordion, ~290 words each: a literal `HOOK`, a slide-by-slide `ANGLE`, `PAYOFF`, and a `WHY NOW` tied to today's trending.
+6. **§6 Ask** — freeform Q&A grounded in the day's brief + your Obsidian vault.
+
+The register is deliberately different from System B: the briefing is an operator briefing another operator (em dashes welcome), tuned to `docs/briefing-quality-spec.md`. Content Package was removed.
 
 Plus **quick capture**, an **archive** (list + calendar heatmap, `tag:` search), and an Obsidian vault uploader.
 
@@ -24,7 +26,7 @@ Plus **quick capture**, an **archive** (list + calendar heatmap, `tag:` search),
 | Framework | Next.js 16 (App Router) + React 19 + TypeScript |
 | Styling | Tailwind CSS v4 — warm editorial dark theme (Manrope / Outfit / JetBrains Mono) |
 | Database | **Supabase** (Postgres + **pgvector**) |
-| LLM | **OpenAI** — `gpt-4o` (concept + content package), `gpt-4o-mini` (trending / authorities / ask) |
+| LLM | **OpenAI** — `MB_MODEL_HEAVY` (default `gpt-5`) runs every content section; `MB_MODEL_UTILITY` (default `gpt-4o-mini`) runs only the topic seed, web search, and Ask/Connect helpers |
 | Embeddings | **OpenAI** `text-embedding-3-small` (1536-dim) |
 
 ### What changed vs the MongoDB original
@@ -83,15 +85,19 @@ Open the app → **Generate today's brief**. It streams in section by section (c
 GET /api/briefing/today
   ├─ exists → render (cost $0)
   └─ empty  → POST /api/briefing/generate → { job_id }
-                └─ background job (Next `after()`):
+                └─ background job (Next `after()`), 3 phases on the HEAVY model:
+                     seed (utility) → 2× web_search (utility, freshness)
                      Phase 1 (parallel): concept · trending · authorities
-                        └─ schema-validated; any failed section gets one recovery pass
-                     Phase 2: resources + content_package + intro + takeaway
-                        └─ 3s last-ditch retry on failure
+                        └─ schema-validated; failed section gets one recovery pass
+                     Phase 2 (parallel): resources · content_angles
+                     Phase 3: intro + quick_takeaway (generated LAST, sees the
+                        whole briefing, so it can tie the news → concept → angles)
                      → persist to `briefings` with auto-derived tags
              frontend polls GET /api/briefing/job/{id} every 2.5s,
              renders each section as it lands (shimmer skeletons for the rest).
 ```
+
+Per-section token usage is logged to the server console (`[briefing] concept · gpt-5 · N in / M out`) so a quality/cost regression is visible the day it happens.
 
 Job state is persisted to `briefing_jobs` at every stage, so if the backend dies mid-generation the frontend detects the stale job (>3 min) and silently restarts once.
 
@@ -109,7 +115,9 @@ Deploy to **Vercel** and point it at your Supabase project. Set the three env va
 
 ## Notes / next steps
 
-- **Trending grounding.** Trending moments are currently model-generated with a "use real, verifiable events" instruction. The highest-value enhancement is wiring OpenAI's web-search tool (Responses API) into `genTrending` so moments are grounded in live search results.
+- **Freshness.** Trending, Authorities, and Resources are grounded in **live web search** — the generate job runs two OpenAI `web_search` (Responses API) queries first (recent news + recent people/essays) and the model may only use real events/URLs from those results. This is what stops the "old news" problem.
+- **Cost & timing (important with `gpt-5`).** The depth upgrade puts ~6 content calls on the heavy model across 3 phases. Target cost is **≈ $0.35 per fresh briefing** (matching the `mar-br-*` reference); cached loads stay $0. But generation now takes **~2–5 minutes** on `gpt-5`. That matters for hosting: it will exceed **Vercel Hobby's 60s** and can exceed **Pro's 300s** function cap. For reliable generation, run on a long-running host (Railway / a VM) or move the job to a queue/worker. The frontend's abandon-and-retry recovery keeps the UI sane, but a briefing only *saves* if the job finishes within the function's time limit. Set `MB_MODEL_HEAVY` to a faster model if you need to fit a tighter cap.
+- **Acceptance check.** After a real run, verify against `docs/briefing-quality-spec.md` §8: concept ≥1,300 words, ≥6 named Indian brands, a real citation, no C-suite authorities, and a clean banned-word grep over the payload.
 
 ---
 

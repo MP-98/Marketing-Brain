@@ -20,6 +20,25 @@ export interface LlmJsonOptions {
   name?: string;
   /** How many attempts per model before falling through to the next. */
   attemptsPerModel?: number;
+  /** Label for per-section token logging (briefing-quality-spec §6.3). */
+  label?: string;
+  /** gpt-5 output length control. Ignored on models that don't support it. */
+  verbosity?: "low" | "medium" | "high";
+}
+
+// verbosity / reasoning_effort only apply to gpt-5 + o-series; sending them to
+// gpt-4o returns a 400, so gate by model family.
+function supportsVerbosity(model: string): boolean {
+  return /^gpt-5/.test(model) || /^o\d/.test(model);
+}
+
+// Rough USD estimate per section so regressions are visible in logs. Adjust
+// rates as pricing changes; this is a signal, not billing.
+function logUsage(label: string, model: string, usage?: { prompt_tokens?: number; completion_tokens?: number }) {
+  if (!label || !usage) return;
+  const inTok = usage.prompt_tokens ?? 0;
+  const outTok = usage.completion_tokens ?? 0;
+  console.log(`[briefing] ${label} · ${model} · ${inTok} in / ${outTok} out`);
 }
 
 /**
@@ -46,6 +65,7 @@ export async function llmJson<T = unknown>(
         const res = await client().chat.completions.create({
           model,
           max_completion_tokens: maxTokens,
+          ...(opts.verbosity && supportsVerbosity(model) ? { verbosity: opts.verbosity } : {}),
           messages: [
             ...(system ? [{ role: "system" as const, content: system }] : []),
             { role: "user" as const, content: prompt },
@@ -59,7 +79,9 @@ export async function llmJson<T = unknown>(
         const choice = res.choices[0]?.message;
         if (choice?.refusal) throw new Error("Model refused the request");
         const text = choice?.content ?? "";
-        return JSON.parse(text) as T;
+        const parsed = JSON.parse(text) as T;
+        if (opts.label) logUsage(opts.label, model, res.usage);
+        return parsed;
       } catch (err) {
         lastErr = err;
         const delay = 400 * Math.pow(2, attempt);
@@ -73,6 +95,27 @@ export async function llmJson<T = unknown>(
       lastErr instanceof Error ? lastErr.message : String(lastErr)
     }`,
   );
+}
+
+/**
+ * Live web search via OpenAI's Responses API `web_search` tool. Returns a text
+ * digest (with URLs + dates) the model grounds on. Best-effort: returns "" on
+ * failure so it never breaks a briefing.
+ */
+export async function webSearch(
+  query: string,
+  opts?: { model?: string; contextSize?: "low" | "medium" | "high" },
+): Promise<string> {
+  try {
+    const res = await client().responses.create({
+      model: opts?.model ?? env.modelUtility(),
+      tools: [{ type: "web_search", search_context_size: opts?.contextSize ?? "medium" }],
+      input: query,
+    });
+    return res.output_text ?? "";
+  } catch {
+    return "";
+  }
 }
 
 /** Plain markdown/text completion (used by Ask). Single model. */

@@ -16,13 +16,17 @@ const EMPTY_SECTIONS: JobSections = {
   concept: "pending",
   trending: "pending",
   authorities: "pending",
-  phase2: "pending",
+  resources: "pending",
+  angles: "pending",
+  closing: "pending",
 };
 const ALL_DONE: JobSections = {
   concept: "done",
   trending: "done",
   authorities: "done",
-  phase2: "done",
+  resources: "done",
+  angles: "done",
+  closing: "done",
 };
 
 type Phase = "idle" | "loading" | "generating" | "ready" | "empty";

@@ -10,7 +10,10 @@ export const env = {
   supabaseUrl: () => required("NEXT_PUBLIC_SUPABASE_URL"),
   supabaseServiceKey: () => required("SUPABASE_SERVICE_ROLE_KEY"),
   openaiKey: () => required("OPENAI_API_KEY"),
-  modelHeavy: () => process.env.MB_MODEL_HEAVY || "gpt-4o",
-  modelLight: () => process.env.MB_MODEL_LIGHT || "gpt-4o-mini",
+  // HEAVY runs every content-bearing section (concept, trending, authorities,
+  // resources, angles, intro/takeaway). UTILITY runs only the topic seed, web
+  // search, and embeddings — never content (briefing-quality-spec §6.1).
+  modelHeavy: () => process.env.MB_MODEL_HEAVY || "gpt-5",
+  modelUtility: () => process.env.MB_MODEL_UTILITY || "gpt-4o-mini",
   embedModel: () => process.env.MB_EMBED_MODEL || "text-embedding-3-small",
 };

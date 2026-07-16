@@ -19,7 +19,7 @@ export async function POST(req: Request) {
       `Return JSON { message }.`,
     {
       system: BRAIN_SYSTEM,
-      models: [env.modelLight()],
+      models: [env.modelUtility()],
       schema: connectMessageSchema,
       maxTokens: 500,
     },

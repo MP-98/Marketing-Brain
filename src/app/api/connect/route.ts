@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     my_pov: string;
   }>(connectPrompt(thought, notesBlock), {
     system: BRAIN_SYSTEM,
-    models: [env.modelHeavy(), env.modelLight()],
+    models: [env.modelHeavy(), env.modelUtility()],
     schema: connectSchema,
     maxTokens: 3000,
   });

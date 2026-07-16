@@ -1,6 +1,6 @@
 // ── Briefing payload shape (System A) ────────────────────────────────────
-// Mirrors the original schema, with the v1 change from context.md §3.4:
-// `content_angles` (finished-feeling drafts) → `content_package` (raw material).
+// Depth + structure tuned to docs/briefing-quality-spec.md (matches mar-br-2).
+// Content Package was removed; one rich `content_angles` section survives.
 
 export interface ConceptFailureMode {
   title: string;
@@ -9,7 +9,7 @@ export interface ConceptFailureMode {
 export interface ConceptCaseStudy {
   brand: string;
   story: string;
-  takeaway: string;
+  steal_this: string; // was `takeaway`; now a 25-35 word imperative instruction
 }
 export interface Concept {
   title: string;
@@ -25,6 +25,7 @@ export interface Concept {
 
 export interface TrendingItem {
   title: string;
+  event_date?: string; // YYYY-MM-DD; optional so pre-change archived rows still render
   what_happened: string;
   why_interesting: string;
   what_to_do: string; // the reactive marketing angle (D2C/FMCG lens)
@@ -45,19 +46,23 @@ export interface AuthorityItem {
   origin: "India" | "Global";
   career: string;
   known_for: string;
-  recent_piece: string;
+  recent_piece: string; // must state the ARGUMENT, not just that it exists
   what_to_track: string;
-  linkedin_message: string; // DRAFT ONLY, <280 chars, never auto-sent (§3.3)
+  why_reachable: string; // one line: why this person would plausibly reply (§5)
+  linkedin_message: string; // DRAFT ONLY, 150-230 chars, never auto-sent (§3.3)
   where_to_follow: { platform: string; handle_or_url: string }[];
 }
 
-// v1: content package — a brief a writer would want, not a draft they'd publish.
-export interface ContentPackageItem {
-  core_point: string; // the one point worth making
-  angle_type: "take" | "case study" | "lesson";
-  facts_to_preserve: string[]; // specific names / numbers / facts to keep
-  why_postable: string; // what makes it worth posting now
-  platform_fit: string; // e.g. "LinkedIn personal", "X personal"
+// Content angles — 5 ready-to-ship post ideas on 5 DIFFERENT topics, each
+// written for that platform's ranking mechanics.
+export interface ContentAngleItem {
+  platform: string; // LinkedIn carousel | Instagram Reel | Twitter/X | Substack | ...
+  topic_source?: string; // which trending item / concept it draws from (optional: old rows)
+  title: string;
+  hook: string; // literal opening copy, in quotes — not a description of a hook
+  angle: string; // slide-by-slide / beat-by-beat shot list
+  payoff: string; // ~25 words: what the reader walks away able to do
+  why_now: string; // ~30 words, tied to the item named in topic_source
 }
 
 export interface BriefingPayload {
@@ -66,20 +71,23 @@ export interface BriefingPayload {
   trending: TrendingItem[];
   resources: ResourceItem[];
   authorities: AuthorityItem[];
-  content_package: ContentPackageItem[];
+  content_angles: ContentAngleItem[];
   quick_takeaway: string;
-  vault_connections?: string[]; // §3.2 — ties today's topics back to the vault
+  vault_connections?: string[]; // ties today's topics back to the vault
   generated_at: string;
   date: string;
 }
 
 // ── Job state ────────────────────────────────────────────────────────────
+// Stages match the 3-phase pipeline (briefing-quality-spec §6.2).
 export type SectionStatus = "pending" | "done" | "error";
 export interface JobSections {
   concept: SectionStatus;
   trending: SectionStatus;
   authorities: SectionStatus;
-  phase2: SectionStatus;
+  resources: SectionStatus;
+  angles: SectionStatus;
+  closing: SectionStatus; // intro + quick_takeaway (generated last, sees all)
 }
 export type JobStatus = "pending" | "done" | "error" | "abandoned";
 

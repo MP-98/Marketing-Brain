@@ -2,28 +2,67 @@
 
 import { useState } from "react";
 import {
-  BookOpen,
-  Flame,
-  Library,
-  Users,
-  Package,
   ExternalLink,
   Copy,
   Check,
   RefreshCw,
   Link2,
   AlertTriangle,
+  ChevronDown,
 } from "lucide-react";
-import { Card, SectionHeading, Eyebrow, Skeleton, Button, Chip } from "./ui";
+import { Card, Button } from "./ui";
+import { cn } from "@/lib/utils";
 import type {
   BriefingPayload,
   Concept,
+  ConceptCaseStudy,
   TrendingItem,
   ResourceItem,
   AuthorityItem,
-  ContentPackageItem,
+  ContentAngleItem,
   JobSections,
 } from "@/lib/types";
+
+// ── shared briefing primitives ──────────────────────────────────────────────
+function SectionEyebrow({ n, label, theme }: { n: string; label: string; theme?: string }) {
+  return (
+    <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-accent/85">
+      §{n} · {label}
+      {theme ? ` · ${theme.toUpperCase()}` : ""}
+    </p>
+  );
+}
+function SectionH1({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="font-display text-2xl sm:text-3xl font-light tracking-tight text-fg-muted mt-1.5 mb-6">
+      {children}
+    </h2>
+  );
+}
+function MicroLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent/75">
+      {children}
+    </span>
+  );
+}
+function Block({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <MicroLabel>{label}</MicroLabel>
+      <div className="mt-1.5 text-[15px] text-fg leading-[1.72]">{children}</div>
+    </div>
+  );
+}
+
+// State machine so old/archived rows (missing a section) don't spin forever.
+type Present = "ready" | "loading" | "error" | "empty";
+function present<T>(items: T | undefined | null, status: string): Present {
+  if (items && (!Array.isArray(items) || items.length > 0)) return "ready";
+  if (status === "error") return "error";
+  if (status === "done") return "empty";
+  return "loading";
+}
 
 export function BriefingView({
   data,
@@ -35,158 +74,151 @@ export function BriefingView({
   date: string;
 }) {
   return (
-    <div className="space-y-16">
-      {data.intro && (
-        <p className="text-lg sm:text-xl leading-relaxed text-fg-muted font-light max-w-3xl">
-          {data.intro}
-        </p>
-      )}
+    <div className="space-y-20">
+      {data.intro && <PullQuote>{data.intro}</PullQuote>}
 
       <ConceptBlock concept={data.concept} status={sections.concept} />
       <TrendingBlock items={data.trending} status={sections.trending} />
-      <ResourcesBlock items={data.resources} status={sections.phase2} />
+      <ResourcesBlock items={data.resources} status={sections.resources} />
       <AuthoritiesBlock items={data.authorities} status={sections.authorities} date={date} />
-      <ContentPackageBlock items={data.content_package} status={sections.phase2} />
+      <ContentAnglesBlock items={data.content_angles} status={sections.angles} />
 
       {data.vault_connections && data.vault_connections.length > 0 && (
         <VaultConnections items={data.vault_connections} />
       )}
 
-      <QuickTakeaway text={data.quick_takeaway} status={sections.phase2} />
+      <QuickTakeaway text={data.quick_takeaway} status={sections.closing} />
+    </div>
+  );
+}
+
+// ── intro / takeaway pull-quotes ────────────────────────────────────────────
+function PullQuote({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="fade-up border-l-2 border-accent/50 pl-5 sm:pl-6">
+      <p className="text-lg sm:text-xl leading-relaxed text-fg-muted font-light">{children}</p>
     </div>
   );
 }
 
 // ── §1 Concept ──────────────────────────────────────────────────────────────
 function ConceptBlock({ concept, status }: { concept?: Concept; status: string }) {
+  const p = present(concept, status);
   return (
     <section className="fade-up">
-      <SectionHeading n="01" title="The Concept" hint="One idea, deep enough to teach" />
-      {!concept ? (
-        status === "error" ? (
-          <ErrorNote label="concept" />
-        ) : (
-          <ConceptSkeleton />
-        )
-      ) : (
-        <Card className="p-6 sm:p-8">
-          <div className="flex items-center gap-2 mb-3">
-            <BookOpen className="w-4 h-4 text-accent-strong" />
-            <Chip active>{concept.theme}</Chip>
-          </div>
-          <h3 className="font-display text-2xl sm:text-3xl font-semibold tracking-tight mb-4 text-fg">
+      <SectionEyebrow n="1" label="Concept of the Day" theme={concept?.theme} />
+      {p === "loading" && <ConceptSkeleton />}
+      {p === "error" && <ErrorNote label="concept" />}
+      {p === "ready" && concept && (
+        <>
+          <h1 className="font-display text-3xl sm:text-[2.5rem] font-semibold tracking-tight text-fg leading-[1.1] mt-2 mb-7">
             {concept.title}
-          </h3>
-          <p className="text-fg-muted leading-relaxed mb-6">{concept.intro_problem}</p>
+          </h1>
 
-          <div className="grid sm:grid-cols-2 gap-6">
-            <Field label="What it is" body={concept.what_it_is} />
-            <Field label="Why it matters" body={concept.why_it_matters} />
-          </div>
+          <div className="space-y-6">
+            <p className="text-[15px] text-fg leading-[1.72]">{concept.intro_problem}</p>
+            <Block label="What it is">{concept.what_it_is}</Block>
+            <Block label="Why it matters">{concept.why_it_matters}</Block>
 
-          <div className="mt-6">
-            <Field label="How it works" body={concept.mechanism} />
-          </div>
+            <div>
+              <MicroLabel>Failure modes</MicroLabel>
+              <div className="grid sm:grid-cols-3 gap-4 mt-3">
+                {concept.failure_modes.map((f, i) => (
+                  <div key={i} className="border-l-2 border-danger/50 pl-3">
+                    <p className="text-[13px] font-semibold text-fg mb-1">{f.title}</p>
+                    <p className="text-[13px] text-fg-muted leading-relaxed">{f.body}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-          <TwoColList title="Failure modes" items={concept.failure_modes} tone="danger" />
-          <TwoColList title="Common misuse" items={concept.common_misuse} tone="muted" />
+            <Block label="Mechanism — how to apply">{concept.mechanism}</Block>
 
-          <div className="mt-8">
-            <Eyebrow>Case studies</Eyebrow>
-            <div className="grid sm:grid-cols-3 gap-4 mt-3">
-              {concept.case_studies.map((cs, i) => (
-                <div
-                  key={i}
-                  className="rounded-xl border border-border bg-surface-2/60 p-4"
-                >
-                  <p className="font-display font-semibold text-fg mb-1.5">{cs.brand}</p>
-                  <p className="text-[13px] text-fg-muted leading-relaxed mb-3">{cs.story}</p>
-                  <p className="text-[13px] text-accent leading-relaxed border-t border-border pt-2">
-                    {cs.takeaway}
-                  </p>
-                </div>
-              ))}
+            <div>
+              <MicroLabel>Common misuse</MicroLabel>
+              <div className="grid sm:grid-cols-3 gap-4 mt-3">
+                {concept.common_misuse.map((f, i) => (
+                  <div key={i} className="border-l-2 border-accent-dim/60 pl-3">
+                    <p className="text-[13px] font-semibold text-fg mb-1">{f.title}</p>
+                    <p className="text-[13px] text-fg-muted leading-relaxed">{f.body}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <MicroLabel>Case studies</MicroLabel>
+              <div className="grid gap-3 mt-3">
+                {concept.case_studies.map((cs, i) => (
+                  <CaseStudyCard key={i} cs={cs} />
+                ))}
+              </div>
             </div>
           </div>
-        </Card>
+        </>
       )}
     </section>
   );
 }
 
-function Field({ label, body }: { label: string; body: string }) {
+function CaseStudyCard({ cs }: { cs: ConceptCaseStudy }) {
+  // backward-compat: older rows carry `takeaway` instead of `steal_this`
+  const steal = cs.steal_this ?? (cs as unknown as { takeaway?: string }).takeaway ?? "";
   return (
-    <div>
-      <Eyebrow>{label}</Eyebrow>
-      <p className="text-[15px] text-fg leading-relaxed mt-1.5">{body}</p>
+    <div className="rounded-xl border border-border bg-surface/50 p-4 sm:p-5">
+      <p className="font-display font-semibold text-fg mb-1.5">{cs.brand}</p>
+      <p className="text-[14px] text-fg-muted leading-relaxed">{cs.story}</p>
+      {steal && (
+        <div className="mt-3 pt-3 border-t border-border">
+          <MicroLabel>Steal this</MicroLabel>
+          <p className="text-[13px] text-accent leading-relaxed mt-1">{steal}</p>
+        </div>
+      )}
     </div>
   );
 }
 
-function TwoColList({
-  title,
-  items,
-  tone,
-}: {
-  title: string;
-  items: { title: string; body: string }[];
-  tone: "danger" | "muted";
-}) {
-  return (
-    <div className="mt-6">
-      <Eyebrow>{title}</Eyebrow>
-      <div className="grid sm:grid-cols-3 gap-4 mt-3">
-        {items.map((it, i) => (
-          <div key={i} className="border-l-2 pl-3" style={{ borderColor: tone === "danger" ? "var(--color-danger)" : "var(--color-accent-dim)" }}>
-            <p className="text-[13px] font-semibold text-fg mb-0.5">{it.title}</p>
-            <p className="text-[13px] text-fg-muted leading-relaxed">{it.body}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── §2 Trending ─────────────────────────────────────────────────────────────
+// ── §2 Trending (accordion) ─────────────────────────────────────────────────
 function TrendingBlock({ items, status }: { items?: TrendingItem[]; status: string }) {
+  const p = present(items, status);
   return (
     <section className="fade-up">
-      <SectionHeading
-        n="02"
-        title="Reactive Moments"
-        hint="Real events, with the marketing angle on top"
-      />
-      {!items ? (
-        status === "error" ? <ErrorNote label="trending" /> : <ListSkeleton rows={3} />
-      ) : (
-        <div className="space-y-3">
+      <SectionEyebrow n="2" label="What's Trending · Pop Culture × Marketing" />
+      <SectionH1>This week&apos;s signal</SectionH1>
+      {p === "loading" && <ListSkeleton rows={3} />}
+      {p === "error" && <ErrorNote label="trending" />}
+      {p === "empty" && <EmptyNote />}
+      {p === "ready" && items && (
+        <div className="space-y-2.5">
           {items.map((t, i) => (
-            <Card key={i} className="p-5 sm:p-6 hover:border-border-strong transition-colors">
-              <div className="flex items-start gap-3">
-                <Flame className="w-4 h-4 text-accent-strong shrink-0 mt-1" />
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-display text-lg font-semibold text-fg">{t.title}</h3>
-                  <p className="text-[14px] text-fg-muted leading-relaxed mt-1.5">
-                    {t.what_happened}
-                  </p>
-                  <div className="grid sm:grid-cols-2 gap-4 mt-4">
-                    <MiniField label="Why it's live" body={t.why_interesting} />
-                    <MiniField label="The angle" body={t.what_to_do} accent />
-                  </div>
+            <Accordion key={i} defaultOpen={i === 0} title={t.title}>
+              <div className="space-y-4 pt-1">
+                <Block label="What happened">{t.what_happened}</Block>
+                <Block label="Why it's interesting">{t.why_interesting}</Block>
+                <Block label="What to do with it">
+                  <span className="whitespace-pre-line">{t.what_to_do}</span>
+                </Block>
+                <div className="flex items-center justify-between">
+                  {t.event_date ? (
+                    <span className="font-mono text-[11px] text-fg-subtle tabular-nums">
+                      {t.event_date}
+                    </span>
+                  ) : (
+                    <span />
+                  )}
                   {t.source?.url && (
                     <a
                       href={t.source.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-[12px] text-fg-subtle hover:text-accent-strong mt-3 font-mono"
+                      className="inline-flex items-center gap-1 text-[12px] text-fg-subtle hover:text-accent-strong font-mono"
                     >
-                      <ExternalLink className="w-3 h-3" />
-                      {t.source.publication}
+                      {t.source.publication} <ExternalLink className="w-3 h-3" />
                     </a>
                   )}
                 </div>
               </div>
-            </Card>
+            </Accordion>
           ))}
         </div>
       )}
@@ -194,38 +226,34 @@ function TrendingBlock({ items, status }: { items?: TrendingItem[]; status: stri
   );
 }
 
-function MiniField({ label, body, accent }: { label: string; body: string; accent?: boolean }) {
-  return (
-    <div>
-      <Eyebrow>{label}</Eyebrow>
-      <p className={`text-[13px] leading-relaxed mt-1 ${accent ? "text-accent" : "text-fg-muted"}`}>
-        {body}
-      </p>
-    </div>
-  );
-}
-
 // ── §3 Resources ────────────────────────────────────────────────────────────
 function ResourcesBlock({ items, status }: { items?: ResourceItem[]; status: string }) {
+  const p = present(items, status);
   return (
     <section className="fade-up">
-      <SectionHeading n="03" title="Worth Your Time" hint="High-signal reading, watching, listening" />
-      {!items ? (
-        status === "error" ? <ErrorNote label="resources" /> : <GridSkeleton />
-      ) : (
+      <SectionEyebrow n="3" label="Underrated Resources" />
+      <SectionH1>Worth your time today</SectionH1>
+      {p === "loading" && <GridSkeleton />}
+      {p === "error" && <ErrorNote label="resources" />}
+      {p === "empty" && <EmptyNote />}
+      {p === "ready" && items && (
         <div className="grid sm:grid-cols-2 gap-3">
           {items.map((r, i) => {
             const inner = (
               <>
                 <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-accent-dim">
-                    {r.format}
+                  <MicroLabel>{r.format}</MicroLabel>
+                  <span className="font-mono text-[10px] text-fg-subtle truncate max-w-[45%]">
+                    {r.author}
                   </span>
-                  {r.url && <ExternalLink className="w-3.5 h-3.5 text-fg-subtle" />}
                 </div>
                 <p className="font-display font-semibold text-fg leading-snug">{r.title}</p>
-                <p className="text-[12px] text-fg-subtle mt-0.5">{r.author}</p>
                 <p className="text-[13px] text-fg-muted leading-relaxed mt-2">{r.description}</p>
+                {r.url && (
+                  <span className="inline-flex items-center gap-1 text-[12px] text-accent-strong font-mono mt-3">
+                    open <ExternalLink className="w-3 h-3" />
+                  </span>
+                )}
               </>
             );
             return r.url ? (
@@ -234,16 +262,12 @@ function ResourcesBlock({ items, status }: { items?: ResourceItem[]; status: str
                 href={r.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group rounded-xl border border-border bg-surface/60 p-4 hover:border-accent-dim hover:bg-surface-2/60 transition-colors flex items-center gap-1"
+                className="rounded-xl border border-border bg-surface/50 p-4 hover:border-accent-dim transition-colors"
               >
-                <div className="flex-1">
-                  <Library className="w-4 h-4 text-accent-strong mb-2" />
-                  {inner}
-                </div>
+                {inner}
               </a>
             ) : (
-              <div key={i} className="rounded-xl border border-border bg-surface/60 p-4">
-                <Library className="w-4 h-4 text-accent-strong mb-2" />
+              <div key={i} className="rounded-xl border border-border bg-surface/50 p-4">
                 {inner}
               </div>
             );
@@ -264,12 +288,15 @@ function AuthoritiesBlock({
   status: string;
   date: string;
 }) {
+  const p = present(items, status);
   return (
     <section className="fade-up">
-      <SectionHeading n="04" title="People to Know" hint="Tied to today's topics" />
-      {!items ? (
-        status === "error" ? <ErrorNote label="authorities" /> : <ListSkeleton rows={2} />
-      ) : (
+      <SectionEyebrow n="4" label={`Authorities to Know · ${items?.length ?? 3} Fresh Voices`} />
+      <SectionH1>Worth tracking</SectionH1>
+      {p === "loading" && <ListSkeleton rows={2} />}
+      {p === "error" && <ErrorNote label="authorities" />}
+      {p === "empty" && <EmptyNote />}
+      {p === "ready" && items && (
         <div className="space-y-3">
           {items.map((a, i) => (
             <AuthorityCard key={i} a={a} index={i} date={date} />
@@ -290,7 +317,6 @@ function AuthorityCard({ a, index, date }: { a: AuthorityItem; index: number; da
     setCopied(true);
     setTimeout(() => setCopied(false), 1600);
   }
-
   async function regen() {
     setBusy(true);
     try {
@@ -315,98 +341,95 @@ function AuthorityCard({ a, index, date }: { a: AuthorityItem; index: number; da
 
   return (
     <Card className="p-5 sm:p-6">
-      <div className="flex items-start gap-3">
-        <Users className="w-4 h-4 text-accent-strong shrink-0 mt-1" />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-display text-lg font-semibold text-fg">{a.name}</h3>
-            <Chip>{a.origin}</Chip>
-          </div>
-          <p className="text-[13px] text-fg-muted mt-0.5">{a.current_role}</p>
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="font-display text-xl font-semibold text-fg leading-tight">{a.name}</h3>
+        <span className="font-mono text-[11px] text-accent/80 shrink-0 mt-1">{a.origin}</span>
+      </div>
+      <p className="font-mono text-[12px] text-fg-subtle mt-1">{a.current_role}</p>
 
-          <div className="grid sm:grid-cols-2 gap-4 mt-4">
-            <MiniField label="Known for" body={a.known_for} />
-            <MiniField label="Track because" body={a.what_to_track} />
-          </div>
-          {a.recent_piece && (
-            <p className="text-[13px] text-fg-muted leading-relaxed mt-3">
-              <span className="text-fg-subtle">Recent: </span>
-              {a.recent_piece}
-            </p>
-          )}
+      <div className="mt-4 space-y-3.5">
+        <Block label="Career">{a.career}</Block>
+        <Block label="Known for">{a.known_for}</Block>
+        <Block label="A specific recent piece">{a.recent_piece}</Block>
+        <Block label="What to track">{a.what_to_track}</Block>
+        {a.why_reachable && <Block label="Why reachable">{a.why_reachable}</Block>}
+      </div>
 
-          {/* LinkedIn draft — always a manual, human-reviewed step (§3.3) */}
-          <div className="mt-4 rounded-xl border border-border bg-surface-2/60 p-3.5">
-            <div className="flex items-center justify-between mb-2">
-              <Eyebrow>Connect draft — review before sending</Eyebrow>
-              <span className="font-mono text-[10px] text-fg-subtle tabular-nums">
-                {message.length}/280
-              </span>
-            </div>
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={3}
-              className="w-full bg-transparent text-[13px] text-fg leading-relaxed resize-none outline-none"
-            />
-            <div className="flex items-center gap-2 mt-2">
-              <Button size="sm" variant="outline" onClick={copy}>
-                {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                {copied ? "Copied" : "Copy"}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={regen} disabled={busy}>
-                <RefreshCw className={`w-3.5 h-3.5 ${busy ? "animate-spin" : ""}`} />
-                Redraft
-              </Button>
-              {a.where_to_follow?.[0]?.handle_or_url && (
-                <span className="text-[11px] text-fg-subtle font-mono ml-auto truncate">
-                  {a.where_to_follow[0].platform}: {a.where_to_follow[0].handle_or_url}
-                </span>
-              )}
-            </div>
-          </div>
+      {/* connect draft — manual, human-reviewed step (§3.3) */}
+      <div className="mt-4 rounded-xl border border-border bg-surface-2/60 p-3.5">
+        <div className="flex items-center justify-between mb-2">
+          <MicroLabel>LinkedIn connect message — review before sending</MicroLabel>
+          <span className="font-mono text-[10px] text-fg-subtle tabular-nums">
+            {message.length} chars
+          </span>
+        </div>
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          rows={3}
+          className="w-full bg-transparent text-[13px] text-fg leading-relaxed resize-none outline-none"
+        />
+        <div className="flex items-center gap-2 mt-2">
+          <Button size="sm" variant="outline" onClick={copy}>
+            {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? "Copied" : "Copy"}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={regen} disabled={busy}>
+            <RefreshCw className={cn("w-3.5 h-3.5", busy && "animate-spin")} />
+            Redraft
+          </Button>
         </div>
       </div>
+
+      {a.where_to_follow?.length > 0 && (
+        <div className="mt-3">
+          <MicroLabel>Where to follow</MicroLabel>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5">
+            {a.where_to_follow.map((w, i) => (
+              <span key={i} className="text-[12px] text-fg-muted font-mono">
+                {w.platform}: {w.handle_or_url}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
 
-// ── §5 Content Package ──────────────────────────────────────────────────────
-function ContentPackageBlock({ items, status }: { items?: ContentPackageItem[]; status: string }) {
+// ── §5 Content Angles (accordion) ───────────────────────────────────────────
+function ContentAnglesBlock({ items, status }: { items?: ContentAngleItem[]; status: string }) {
+  const p = present(items, status);
   return (
     <section className="fade-up">
-      <SectionHeading
-        n="05"
-        title="Content Package"
-        hint="Raw material for your own drafts — not finished copy"
-      />
-      {!items ? (
-        status === "error" ? <ErrorNote label="content package" /> : <GridSkeleton />
-      ) : (
-        <div className="grid sm:grid-cols-2 gap-3">
+      <SectionEyebrow n="5" label="Content Angles" />
+      <SectionH1>Ship today on your feed</SectionH1>
+      {p === "loading" && <ListSkeleton rows={2} />}
+      {p === "error" && <ErrorNote label="content angles" />}
+      {p === "empty" && <EmptyNote />}
+      {p === "ready" && items && (
+        <div className="space-y-2.5">
           {items.map((c, i) => (
-            <Card key={i} className="p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <Package className="w-4 h-4 text-accent-strong" />
-                <Chip active>{c.angle_type}</Chip>
-                <span className="text-[11px] text-fg-subtle font-mono ml-auto">{c.platform_fit}</span>
+            <Accordion
+              key={i}
+              defaultOpen={i === 0}
+              title={c.title}
+              badge={c.platform}
+            >
+              <div className="space-y-4 pt-1">
+                {c.topic_source && (
+                  <p className="font-mono text-[11px] text-fg-subtle">↳ {c.topic_source}</p>
+                )}
+                <Block label="Hook">
+                  <span className="italic text-accent">{c.hook}</span>
+                </Block>
+                <Block label="Angle">
+                  <span className="whitespace-pre-line">{c.angle}</span>
+                </Block>
+                <Block label="Payoff">{c.payoff}</Block>
+                <Block label="Why now">{c.why_now}</Block>
               </div>
-              <p className="text-[15px] font-medium text-fg leading-snug">{c.core_point}</p>
-              <p className="text-[13px] text-accent leading-relaxed mt-2">{c.why_postable}</p>
-              {c.facts_to_preserve?.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-border">
-                  <Eyebrow>Keep these facts</Eyebrow>
-                  <ul className="mt-1.5 space-y-1">
-                    {c.facts_to_preserve.map((f, j) => (
-                      <li key={j} className="text-[12px] text-fg-muted flex gap-2">
-                        <span className="text-accent-dim">—</span>
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </Card>
+            </Accordion>
           ))}
         </div>
       )}
@@ -419,7 +442,7 @@ function VaultConnections({ items }: { items: string[] }) {
     <section className="fade-up">
       <div className="flex items-center gap-2 mb-3">
         <Link2 className="w-4 h-4 text-accent-dim" />
-        <Eyebrow>From your vault</Eyebrow>
+        <MicroLabel>From your vault</MicroLabel>
       </div>
       <div className="flex flex-wrap gap-2">
         {items.map((v, i) => (
@@ -437,41 +460,76 @@ function VaultConnections({ items }: { items: string[] }) {
 
 // ── Quick takeaway ──────────────────────────────────────────────────────────
 function QuickTakeaway({ text, status }: { text?: string; status: string }) {
-  if (!text) {
-    return status === "error" ? null : <Skeleton className="h-24 w-full" />;
-  }
+  const p = present(text, status);
+  if (p === "loading") return <Skeleton className="h-28 w-full" />;
+  if (p !== "ready" || !text) return null;
   return (
-    <section className="fade-up">
-      <div className="rounded-[var(--radius)] border border-accent-strong/25 bg-accent-strong/[0.06] p-6 sm:p-8">
-        <Eyebrow>Today, in one line</Eyebrow>
-        <p className="font-display text-xl sm:text-2xl font-medium text-fg leading-snug mt-2">
-          {text}
-        </p>
-      </div>
+    <section className="fade-up border-l-2 border-accent-strong/50 pl-5 sm:pl-6">
+      <MicroLabel>Quick takeaway</MicroLabel>
+      <p className="font-display text-xl sm:text-2xl font-light text-fg leading-snug mt-2">{text}</p>
     </section>
   );
 }
 
-// ── skeletons + error ───────────────────────────────────────────────────────
+// ── Accordion ────────────────────────────────────────────────────────────────
+function Accordion({
+  title,
+  badge,
+  defaultOpen,
+  children,
+}: {
+  title: string;
+  badge?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(!!defaultOpen);
+  return (
+    <Card className="overflow-hidden">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-3 p-4 sm:p-5 text-left cursor-pointer hover:bg-surface-2/40 transition-colors"
+      >
+        {badge && (
+          <span className="font-mono text-[10px] uppercase tracking-wider text-accent-strong border border-accent-strong/40 rounded px-1.5 py-0.5 shrink-0">
+            {badge}
+          </span>
+        )}
+        <span className="font-display text-lg font-semibold text-fg leading-snug flex-1 min-w-0">
+          {title}
+        </span>
+        <ChevronDown
+          className={cn("w-4 h-4 text-fg-subtle shrink-0 transition-transform", open && "rotate-180")}
+        />
+      </button>
+      {open && <div className="px-4 sm:px-5 pb-5">{children}</div>}
+    </Card>
+  );
+}
+
+// ── skeletons + notes ───────────────────────────────────────────────────────
+function Skeleton({ className }: { className?: string }) {
+  return <div className={cn("shimmer rounded-lg", className)} />;
+}
 function ConceptSkeleton() {
   return (
-    <Card className="p-8 space-y-4">
-      <Skeleton className="h-5 w-24" />
-      <Skeleton className="h-9 w-3/4" />
+    <div className="space-y-4 mt-4">
+      <Skeleton className="h-10 w-3/4" />
       <Skeleton className="h-4 w-full" />
       <Skeleton className="h-4 w-5/6" />
-      <div className="grid sm:grid-cols-2 gap-4 pt-2">
+      <div className="grid sm:grid-cols-3 gap-4 pt-2">
+        <Skeleton className="h-20" />
         <Skeleton className="h-20" />
         <Skeleton className="h-20" />
       </div>
-    </Card>
+    </div>
   );
 }
 function ListSkeleton({ rows }: { rows: number }) {
   return (
     <div className="space-y-3">
       {Array.from({ length: rows }).map((_, i) => (
-        <Skeleton key={i} className="h-28 w-full" />
+        <Skeleton key={i} className="h-24 w-full" />
       ))}
     </div>
   );
@@ -487,9 +545,12 @@ function GridSkeleton() {
 }
 function ErrorNote({ label }: { label: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-danger/30 bg-danger/[0.06] px-4 py-3 text-[13px] text-danger">
+    <div className="flex items-center gap-2 rounded-xl border border-danger/30 bg-danger/[0.06] px-4 py-3 text-[13px] text-danger mt-2">
       <AlertTriangle className="w-4 h-4" />
       Couldn&apos;t generate {label}. Try Refresh to regenerate.
     </div>
   );
+}
+function EmptyNote() {
+  return <p className="text-[13px] text-fg-subtle mt-2">Not available for this briefing.</p>;
 }

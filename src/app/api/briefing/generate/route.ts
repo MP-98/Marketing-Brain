@@ -24,7 +24,14 @@ export async function POST(req: Request) {
           stage: "done",
           from_cache: true,
           briefing_date: date,
-          sections: { concept: "done", trending: "done", authorities: "done", phase2: "done" },
+          sections: {
+            concept: "done",
+            trending: "done",
+            authorities: "done",
+            resources: "done",
+            angles: "done",
+            closing: "done",
+          },
           result: cached as BriefingPayload,
           finished_at: nowISO(),
         })
