@@ -99,10 +99,24 @@ export const trendingSchema = obj({
   },
 });
 
-export function trendingPrompt(freshNews: string, today: string): string {
-  return `Today is ${today}. Surface exactly 5 marketing/culture signals, India-relevant, whose event date is WITHIN THE LAST 7 DAYS. Ground every item in the live search results below — use only real events and the REAL source URLs from the results.
+export function trendingPrompt(
+  freshNews: string,
+  today: string,
+  avoidTitles: string[] = [],
+): string {
+  return `Today is ${today}. Surface exactly 5 marketing signals, India-relevant, whose event date is WITHIN THE LAST 3 DAYS. Ground every item in the live search results below — use only real events and the REAL source URLs from the results.
 
-FRESHNESS IS A HARD GATE: every item must carry event_date (YYYY-MM-DD) taken from the search results. An event from weeks or months ago (an old IPL result, a FIFA story, a campaign from last quarter) is a hard fail even if it's famous — items older than 10 days are automatically discarded by the system, so shipping one wastes a slot. If the results only support 3 genuinely-fresh items, return 3. A global item ships only if the reactive angle for an Indian D2C/FMCG brand is genuinely strong.
+FRESHNESS IS A HARD GATE: every item must carry event_date (YYYY-MM-DD) taken from the search results. An event from weeks or months ago (an old IPL result, a FIFA story, a campaign from last quarter) is a hard fail even if it's famous — stale items are automatically discarded by the system, so shipping one wastes a slot. An item you cannot date from the search results is also discarded, so never guess a date. If the results only support 3 genuinely-fresh items, return 3. A global item ships only if the reactive angle for an Indian D2C/FMCG brand is genuinely strong.
+
+TOPIC GATE — every item must be a MARKETING, BRAND, ADVERTISING, RETAIL or CONSUMER-COMMERCE event: brand launches and repositioning, pricing and packaging moves, ad spend and campaigns, agency/media news, q-commerce and retail shifts, regulator actions (ASCI, FSSAI), creator-economy and platform changes.
+NOT ELIGIBLE: general politics, sports results, film/TV releases, celebrity news, crime, weather, macroeconomics, stock moves. A cultural moment counts ONLY when a specific named brand has already reacted commercially to it — and then the item is about the BRAND'S move, not the cultural event. "A brand could react to this" is not enough. If an item's what_happened cannot name a brand, company, platform or regulator as the actor, it does not belong in this section.
+${
+  avoidTitles.length
+    ? `\nALREADY COVERED — these shipped in the last 3 days. Do NOT repeat them, and do not ship a fresh-dated follow-up that makes the same point about the same story. Pick different stories:\n${avoidTitles
+        .map((t) => `- ${t}`)
+        .join("\n")}\n`
+    : ""
+}
 
 Each item is ~280 words across three fields:
 - event_date: YYYY-MM-DD, from the search results.

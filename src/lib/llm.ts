@@ -101,19 +101,37 @@ export async function llmJson<T = unknown>(
  * Live web search via OpenAI's Responses API `web_search` tool. Returns a text
  * digest (with URLs + dates) the model grounds on. Best-effort: returns "" on
  * failure so it never breaks a briefing.
+ *
+ * ⚠️ An empty return is NOT harmless. The trending/authorities prompts fall back
+ * to "use only events you're certain are real", which makes the model write news
+ * from training data — stale, repetitive, and often off-topic, while the briefing
+ * still looks like it generated fine. So every empty/failed search is logged loud.
  */
 export async function webSearch(
   query: string,
-  opts?: { model?: string; contextSize?: "low" | "medium" | "high" },
+  opts?: { model?: string; contextSize?: "low" | "medium" | "high"; label?: string },
 ): Promise<string> {
+  const label = opts?.label ?? "web_search";
   try {
     const res = await client().responses.create({
       model: opts?.model ?? env.modelUtility(),
       tools: [{ type: "web_search", search_context_size: opts?.contextSize ?? "medium" }],
       input: query,
     });
-    return res.output_text ?? "";
-  } catch {
+    const text = res.output_text ?? "";
+    if (!text.trim()) {
+      console.error(
+        `[briefing] ${label} returned EMPTY — sections will fall back to model memory (expect stale/repeated/off-topic items)`,
+      );
+    } else {
+      console.log(`[briefing] ${label} ok · ${text.length} chars`);
+    }
+    return text;
+  } catch (err) {
+    console.error(
+      `[briefing] ${label} FAILED: ${err instanceof Error ? err.message : String(err)} — ` +
+        `sections will fall back to model memory (expect stale/repeated/off-topic items)`,
+    );
     return "";
   }
 }
